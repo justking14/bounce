@@ -1,0 +1,383 @@
+<!doctype html>
+<head>
+    <title>Be Reborn From The Ashes Of The Fallen King</title>
+    <meta charset="utf-8">
+    <link rel="stylesheet" href="styles.css" type="text/css">
+</head>
+
+<body>
+<main>
+    <canvas class="retro" id="game" width="192" height="192"></canvas>
+</main>
+<body onkeydown="return userControl(event);">
+<script type="text/javascript" src="Sprite.js"></script>
+        
+<script>
+
+var mAllObjects = {
+        tile: [], player:[], wall:[], enemy:[]
+};
+var world = 
+[
+[1,1,1,1,1,1,1,1,1,1,1],
+[1,0,0,0,0,0,1,1,0,1,1],
+[1,0,0,0,0,0,1,0,0,0,1],
+[1,0,0,1,0,0,0,0,0,0,1],
+[1,0,0,0,0,0,1,0,0,0,1],
+[1,0,0,0,0,0,1,1,0,0,1],
+[1,0,0,1,1,1,1,1,1,0,1],
+[1,0,0,0,0,0,0,0,1,0,1],
+[1,1,0,0,0,1,0,0,1,0,1],
+[1,1,1,0,0,0,0,0,1,2,1],
+[1,1,1,1,1,1,1,1,1,1,1]
+
+]
+
+var playerX = 2
+var playerY = 2
+
+var onTitle = true
+
+var gameState = {
+		awaitingPlayerMovement : 1, 
+		movingPlayerAndBullets: 2, 
+		checkingBulletCollision : 3,
+		movingEnemies: 4,
+		checkCollision2: 5
+	}; 
+	
+var currentGameState = gameState.awaitingPlayerMovement;
+
+var distance = function(x1,y1,x2,y2){
+    var a = x1 - x2
+    var b = y1 - y2
+
+    return Math.sqrt( a*a + b*b );
+}
+
+var userControl = function(event){
+    var keycode;
+    
+        if (window.event) {
+            //alert('ie');
+            keycode = event.keyCode;
+        } else if (event.which) {
+            //alert('firefox ');
+            keycode = event.which;
+        }
+        onTitle = false
+        
+        if([32, 37, 38, 39, 40].indexOf(keycode) > -1) {
+            event.preventDefault();
+        }
+        console.log(keycode,   String.fromCharCode(keycode))
+        var key = String.fromCharCode(keycode)
+
+        if(pulsating === false && goingUp === false){
+        if(key === "W"){
+            if(world[playerX][playerY -1] === 0){
+                playerY-=1
+                centerY-=15
+            }else if(world[playerX][playerY -1] === 2){
+                reset();
+            }
+        }else if(key ==="S"){
+            if(world[playerX][playerY + 1] === 0){
+                playerY+=1
+                centerY+=15
+            }else if(world[playerX][playerY + 1] === 2){
+                reset();
+            }
+        }else if(key === "A"){
+            if(world[playerX-1][playerY] === 0){
+                playerX-=1
+                centerX-=15
+            }else if(world[playerX - 1][playerY ] === 2){
+                reset();
+            }
+        }else if(key === "D"){
+            if(world[playerX+1][playerY] === 0){
+                playerX+=1
+                centerX+=15
+            }else if(world[playerX + 1][playerY ] === 2){
+                reset();
+            }
+        }
+    }
+        
+        if(key === "P"){
+            hitWall = false
+            pulsating  = true
+            goingUp = true
+            newDist = 1
+            
+            for(var j = 0; j < mAllObjects["wall"].length; j++){
+                mAllObjects["wall"][j].pulsing = false
+                mAllObjects["wall"][j].pulsedThisTurn = false
+            }
+        }
+    }
+
+
+// get canvas context
+var ctx = document.getElementById('game').getContext('2d');
+
+
+
+
+var sp1 = new Sprite(20,20,20,20,"flower.png")
+
+var mCurrentTime, mElapsedTime, mPreviousTime = Date.now(), mLagTime = 0;
+var kFPS = 30;          // Frames per second
+var kFrameTime = 1 / kFPS;
+var mUpdateIntervalInSeconds = kFrameTime;
+var kMPF = 1000 * kFrameTime; // Milliseconds per frame.
+
+
+var reset = function(){
+    onTitle = true
+    mAllObjects["tile"] = []
+    mAllObjects["wall"] = []
+     centerX = 68 - 15
+     centerY = 38
+     lightDist = 22
+         lightPulse = 3
+         newDist = lightDist
+     goingUp = false
+     evenOdd = false
+     pulsating = false
+     hitWall = false
+     hitWallTimer = Date.now();
+     lastTime = Date.now()
+     playerX = 2
+     playerY = 2
+     initialize();
+}
+var initialize = function(){
+    for(var i = 0; i < world.length; i++){
+        for(var j = 0; j < world[0].length; j++){
+            if(world[i][j] === 0){
+                mAllObjects["tile"].push(new Sprite(i*15 + 15,j*15,15,15,"flower.png"))
+            }else{
+                if(world[i][j] === 1){
+                    mAllObjects["wall"].push(new Sprite(i*15 + 15,j*15,15,15,"wall.png"))
+                }else{
+                    mAllObjects["wall"].push(new Sprite(i*15 + 15,j*15,15,15,"trap.png"))
+
+                }
+
+            }
+        }
+    }
+}
+	
+var runGameLoop = function () {
+        requestAnimationFrame(function () {
+            runGameLoop();
+        });        
+
+        var mCurrentTime = Date.now();
+        var mElapsedTime = mCurrentTime - mPreviousTime;
+		var FPS = 1000 / (mElapsedTime);
+        mPreviousTime = mCurrentTime;
+        mLagTime += mElapsedTime;
+ 
+        draw();
+        //sp1.draw();
+        while (mLagTime >= kMPF) {
+            mLagTime -= kMPF;
+            //gEngine.Physics.collision();
+            updateL();
+        }
+    };
+
+var centerX = 68 - 15
+var centerY = 38
+var lightDist = 22
+    var lightPulse = 3
+    var newDist = lightDist
+var goingUp = false
+var evenOdd = false
+var pulsating = false
+var hitWall = false
+var hitWallTimer = Date.now();
+var lastTime = Date.now()
+
+
+var draw = function(){
+    ctx.clearRect(0, 0, 192, 192);	
+
+    if(onTitle === true){
+        var bg = new Image()
+        bg.src = "b1.png"
+        ctx.drawImage(bg, 0,0)
+    }else{
+    var tileSize = 15
+    var imageTile = new Image()
+    var imageWall = new Image()
+
+
+    for(var j = 0; j < mAllObjects["wall"].length; j++){
+        mAllObjects["wall"][j].draw(ctx);
+        if(mAllObjects["wall"][j].pulsing){
+        }else if(mAllObjects["wall"][j].pulsedThisTurn === false){
+
+            //same x, diff y
+            if(Math.abs(centerX - mAllObjects["wall"][j].x) < 10 && ((centerY - newDist <= mAllObjects["wall"][j].bottom && centerY >= mAllObjects["wall"][j].bottom ) || (centerY + newDist >= mAllObjects["wall"][j].y && centerY <= mAllObjects["wall"][j].y))  ){
+                mAllObjects["wall"][j].pulseDist = 1
+                    mAllObjects["wall"][j].pulsing = true
+                    mAllObjects["wall"][j].pulsedThisTurn = true
+
+            //same y, diff x
+            }else if(Math.abs(centerY - mAllObjects["wall"][j].y) < 10 &&  ((centerX + newDist >= mAllObjects["wall"][j].x && centerX <= mAllObjects["wall"][j].x) || (centerX - newDist <= mAllObjects["wall"][j].right && centerX >= mAllObjects["wall"][j].right))  ){
+                     mAllObjects["wall"][j].pulseDist = 1
+                    mAllObjects["wall"][j].pulsing = true
+                    mAllObjects["wall"][j].pulsedThisTurn = true
+
+            //right
+            }else if(centerX + newDist >= mAllObjects["wall"][j].x && centerX <= mAllObjects["wall"][j].x){
+                if(centerY + newDist >= mAllObjects["wall"][j].y && centerY <= mAllObjects["wall"][j].y){
+                    mAllObjects["wall"][j].pulseDist = 1
+                    mAllObjects["wall"][j].pulsing = true
+                    mAllObjects["wall"][j].pulsedThisTurn = true
+                }else if(centerY - newDist <= mAllObjects["wall"][j].bottom && centerY >= mAllObjects["wall"][j].bottom){
+                    mAllObjects["wall"][j].pulseDist = 1
+                    mAllObjects["wall"][j].pulsing = true
+                    mAllObjects["wall"][j].pulsedThisTurn = true
+                }
+            //left
+            }else if(centerX - newDist <= mAllObjects["wall"][j].right && centerX >= mAllObjects["wall"][j].right){
+                if(centerY + newDist >= mAllObjects["wall"][j].y && centerY <= mAllObjects["wall"][j].y){
+                    mAllObjects["wall"][j].pulseDist = 1
+                    mAllObjects["wall"][j].pulsing = true
+                    mAllObjects["wall"][j].pulsedThisTurn = true
+                }else if(centerY - newDist <= mAllObjects["wall"][j].bottom && centerY >= mAllObjects["wall"][j].bottom){
+                    mAllObjects["wall"][j].pulseDist = 1
+                    mAllObjects["wall"][j].pulsing = true
+                    mAllObjects["wall"][j].pulsedThisTurn = true
+                }
+            }
+        }
+    }
+
+    for(var i = 0; i < mAllObjects["tile"].length; i++){
+        mAllObjects["tile"][i].draw(ctx);
+    }
+ 
+    var pxX = 0//((i / 4) % wd) + 1;
+	var pxY = 0//(Math.floor((i / 4) / wd)) + 1;
+    var imgData=ctx.getImageData(0,0,192,192); 
+    var shouldShow = false
+    if(Date.now() - lastTime > 70 ){
+        lastTime = Date.now()
+        shouldShow = true
+    }
+
+    
+    for (var i=0;i<imgData.data.length;i+=4){//draw light
+        pxX = ((i / 4) % 192) + 1;
+        pxY = (Math.floor((i / 4) / 192)) + 1;
+        var dist = distance(pxX,pxY,centerX,centerY)
+
+        var thisPix = false
+        if(pulsating === true){
+
+            for(var j = 0; j < mAllObjects["wall"].length; j++){
+                if(mAllObjects["wall"][j].pulsing && thisPix === false){
+                    var x = mAllObjects["wall"][j].x + mAllObjects["wall"][j].width/2
+                    var y = mAllObjects["wall"][j].y + mAllObjects["wall"][j].height/2
+                    var dt = distance(pxX,pxY,x,y) 
+                    if(dt< mAllObjects["wall"][j].pulseDist && dt > mAllObjects["wall"][j].pulseDist - 5){
+                        thisPix = true
+                        dist = dt
+                        hitWall = true
+                        hitWallTimer = Date.now();
+                    }
+                }
+            }
+            var dist2 = dist 
+            if( (dist < newDist && dist > newDist - 3) || thisPix === true){
+                if(imgData.data[i + 2] < 225){
+                    imgData.data[i] = imgData.data[i] - dist2*14
+                    imgData.data[i+1] =  imgData.data[i+1] - dist2*14
+                    imgData.data[i+2] = imgData.data[i+2] - dist2*7
+                    imgData.data[i+3] = imgData.data[i+3] - dist2
+                }
+            }else{
+                imgData.data[i] = 0
+                imgData.data[i+1] = 0
+                imgData.data[i+2] = 0
+                imgData.data[i+3] = 255
+            }
+        }else if(pulsating === false){
+            var dist2 = dist 
+
+            if( dist < newDist){
+                imgData.data[i] = imgData.data[i] - dist2*14
+                imgData.data[i+1] =  imgData.data[i+1] - dist2*14
+                imgData.data[i+2] = imgData.data[i+2] - dist2*7
+                imgData.data[i+3] = imgData.data[i+3] - dist2
+            }else{
+                imgData.data[i] = 0
+                imgData.data[i+1] = 0
+                imgData.data[i+2] = 0
+                imgData.data[i+3] = 255
+            }
+    }
+        
+
+
+    }
+    
+    ctx.putImageData(imgData,0,0);
+}
+
+}
+var updateL = function(){
+    if(pulsating === true){
+        if(evenOdd === true){
+            evenOdd = false
+
+            for(var j = 0; j < mAllObjects["wall"].length; j++){
+                mAllObjects["wall"][j].pulseDist+=3
+            }
+            
+            if(newDist > 125){
+                goingUp = false;
+            }else if(newDist < 1){
+            }
+            
+            if(goingUp){
+                if(hitWall === false){
+                    newDist+=5
+                }else if(hitWall === true){
+                    if(Date.now() - hitWallTimer > 120){
+                        goingUp = false
+                    }
+                }
+            }else{
+                if(newDist - 3 < 22){
+                    newDist = 22
+                    pulsating = false;
+
+                }else{
+                    newDist-=3
+                }
+            }
+        }else{
+            evenOdd = true
+        }
+    }   
+}
+// load image
+var image = new Image();
+image.onload = function () {
+    // draw the image into the canvas
+   // ctx.drawImage(image, 0, 0);
+}
+image.src = 'cat.png';
+initialize();
+runGameLoop();
+
+</script>
+</body>
